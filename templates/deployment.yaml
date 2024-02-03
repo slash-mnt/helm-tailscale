@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "helm-tailscale.fullname" . }}
+  labels:
+    {{- include "helm-tailscale.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "helm-tailscale.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "helm-tailscale.labels" . | nindent 8 }}
+	{{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "helm-tailscale.fullname" . }}
+      {{- if eq .Values.tailscale.dns.magic true }}
+      dnsConfig:
+        nameservers: {{- toYaml .Values.tailscale.dns.nameservers | nindent 10 }}
+        searches: {{- toYaml .Values.tailscale.dns.searches | nindent 10 }}
+    {{- end }}
+      initContainers:
+        - name: sysctler
+          image: "ghcr.io/tailscale/tailscale:latest"
+          securityContext:
+            privileged: true
+          command: ["/bin/sh"]
+          args:
+            - -c
+            - sysctl -w net.ipv4.ip_forward=1 net.ipv6.conf.all.forwarding=1
+          resources:
+            requests:
+              cpu: 1m
+              memory: 1Mi
+      containers:
+        - name: tailscale
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: TS_EXTRA_ARGS
+              value: "{{ if not (empty .Values.tailscale.hostname) }} --hostname={{ .Values.tailscale.hostname }}{{ end }}{{ if not (empty .Values.tailscale.tags) }} --advertise-tags={{ join "," .Values.tailscale.tags }}{{ end }}"
+            - name: TS_KUBE_SECRET
+              value: "{{ .Values.tailscale.secret }}"
+            - name: TS_USERSPACE
+              value: "false"
+            - name: TS_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "helm-tailscale.fullname" . }}
+                  key: TS_AUTHKEY
+                  optional: true
+            - name: TS_DEST_IP
+              value: "{{ .Values.tailscale.destination.ip }}"
+            - name: TS_AUTH_ONCE
+              value: "true"
+          securityContext:
+            capabilities:
+              add:
+              - NET_ADMIN
+          resources:
+              {{- toYaml .Values.resources | nindent 12 }}
+    {{- with .Values.nodeSelector }}
+    nodeSelector:
+      {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+    affinity:
+      {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+    tolerations:
+      {{- toYaml . | nindent 8 }}
+    {{- end }}

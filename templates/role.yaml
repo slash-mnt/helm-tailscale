@@ -1,0 +1,14 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "helm-tailscale.fullname" . }}
+  labels:
+    {{- include "helm-tailscale.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resourceNames: ["{{ .Values.tailscale.secret }}"]
+  resources: ["secrets"]
+  verbs: ["get", "update", "patch"]

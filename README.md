@@ -180,11 +180,3 @@ Please ensure:
 
 This project is licensed under the **MIT License**.  
 See the `LICENSE` file for details.
-
----
-
-## References
-
-- Tailscale documentation: https://tailscale.com/kb/
-- Helm documentation: https://helm.sh/docs/
-- Kubernetes documentation: https://kubernetes.io/docs/
